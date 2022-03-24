@@ -1,0 +1,129 @@
+kind: Route
+apiVersion: route.openshift.io/v1
+metadata:
+  name: service-a
+  labels:
+    app: service-a
+spec:
+  to:
+    kind: Service
+    name: service-a
+  port:
+    targetPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-a
+  labels:
+    app: service-a
+spec:
+  ports:
+    - port: 8080
+      name: http
+  selector:
+    app: service-a
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-a
+  labels:
+    app: service-a
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: service-a
+  template:
+    metadata:
+      labels:
+        app: service-a
+    spec:
+      containers:
+        - name: app
+          image: image-registry.openshift-image-registry.svc:5000/biz-metrics/service-a
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+              scheme: HTTP
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+              scheme: HTTP
+          env:
+            - name: SERVICE_URL
+              value: http://service-b:8090/message
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+---
+kind: Route
+apiVersion: route.openshift.io/v1
+metadata:
+  name: service-b
+  labels:
+    app: service-b
+spec:
+  to:
+    kind: Service
+    name: service-b
+  port:
+    targetPort: 8090
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-b
+  labels:
+    app: service-b
+spec:
+  ports:
+    - port: 8090
+      name: http
+  selector:
+    app: service-b
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-b
+  labels:
+    app: service-b
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: service-b
+  template:
+    metadata:
+      labels:
+        app: service-b
+    spec:
+      containers:
+        - name: app
+          image: image-registry.openshift-image-registry.svc:5000/biz-metrics/service-b
+          livenessProbe:
+            httpGet:
+              path: /q/health/live
+              port: 8090
+              scheme: HTTP
+          readinessProbe:
+            httpGet:
+              path: /q/health/ready
+              port: 8090
+              scheme: HTTP
+          env:
+            - name: KUBERNETES_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+            - name: SERVICE_URL
+              value: http://service-a:8080
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8090
+---
